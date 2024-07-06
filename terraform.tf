@@ -1,171 +1,191 @@
 provider "aws" {
   region = "us-east-1"
 }
-
-variable "vpc_cidr" {
-  default = "10.0.0.0/16"
-}
-
-variable "subred_publica01_cidr" {
-  default = "10.0.1.0/24"
-}
-
-variable "subred_publica02_cidr"{
-  default = "10.0.2.0/24"
-}
-
-variable "subred01_privada_cidr" {
-  default = "10.0.3.0/24"
-}
-
-variable "subred02_privada_cidr" {
-  default = "10.0.4.0/24"
-}
-
-variable "ami_id" {
-  default = "ami-04b70fa74e45c3917"
-}
-
-resource "aws_vpc" "red_pirmaria" {
-  cidr_block = var.vpc_cidr
+resource "aws_vpc" "vpcPrimaria" {
+  cidr_block = "10.0.0.0/16"
   enable_dns_support = true
   enable_dns_hostnames = true
 
   tags = {
-    Env = "Prod"
-    Project = "Networking"
+    Name = "vpcPrimaria"
   }
 }
-
-resource "aws_subnet" "zona_publica_1" {
-  vpc_id     = aws_vpc.red_pirmaria.id
-  cidr_block = var.subred_publica01_cidr
+resource "aws_subnet" "subRedPublica1" {
+  vpc_id     = aws_vpc.vpcPrimaria.id
+  cidr_block = "10.0.1.0/24"
   availability_zone = "us-east-1a"
 
   tags = {
-    Env = "Prod"
-    Zone = "PublicA"
+    Name = "subRedPublica1"
+  }
+}
+resource "aws_subnet" "subRedPublica2" {
+  vpc_id     = aws_vpc.vpcPrimaria.id
+  cidr_block = "10.0.2.0/24"
+  availability_zone = "us-east-1b"  # Zona de disponibilidad B
+
+  tags = {
+    Name = "subRedPublica2"
   }
 }
 
-resource "aws_subnet" "zona_publica_2" {
-  vpc_id     = aws_vpc.red_pirmaria.id
-  cidr_block = var.subred_publica01_cidr
+resource "aws_subnet" "subRedPrivada1" {
+  vpc_id     = aws_vpc.vpcPrimaria.id
+  cidr_block = "10.0.3.0/24"
+  availability_zone = "us-east-1a"  # Zona de disponibilidad A
 
-availability_zone = "us-east-1b"
-
-tags = {
-  Env = "Prod"
-  Zone = "PublicB"
-}
+  tags = {
+    Name = "privateSubnet1"
+  }
 }
 
-resource "aws_subnet" "zona_privada_1" {
-vpc_id     = aws_vpc.red_pirmaria.id
-cidr_block = var.subred01_privada_cidr
-availability_zone = "us-east-1a"
+resource "aws_subnet" "subRedPrivada2" {
+  vpc_id     = aws_vpc.vpcPrimaria.id
+  cidr_block = "10.0.4.0/24"
+  availability_zone = "us-east-1b"  # Zona de disponibilidad B
 
-tags = {
-Env = "Prod"
-Zone = "PrivateA"
-}
-}
-
-resource "aws_subnet" "zona_privada_2" {
-vpc_id     = aws_vpc.red_pirmaria.id
-cidr_block = var.subred02_privada_cidr
-availability_zone = "us-east-1b"
-
-tags = {
-Env = "Prod"
-Zone = "PrivateB"
-}
+  tags = {
+    Name = "privateSubnet2"
+  }
 }
 
-resource "aws_internet_gateway" "main_gateway" {
-vpc_id = aws_vpc.red_pirmaria.id
+resource "aws_internet_gateway" "internetGateway" {
+  vpc_id = aws_vpc.vpcPrimaria.id
 
-tags = {
-Env = "Prod"
-Gateway = "MainIGW"
-}
-}
-
-resource "aws_route_table" "tabla_rutas" {
-vpc_id = aws_vpc.red_pirmaria.id
-
-route {
-cidr_block = "0.0.0.0/0"
-gateway_id = aws_internet_gateway.main_gateway.id
+  tags = {
+    Name = "internetGateway"
+  }
 }
 
-tags = {
-Env = "Prod"
-Type = "Public"
-}
-}
+resource "aws_route_table" "tablaRutasPublicas" {
+  vpc_id = aws_vpc.vpcPrimaria.id
 
-resource "aws_route_table_association" "asociacion01" {
-subnet_id      = aws_subnet.zona_publica_1.id
-route_table_id = aws_route_table.tabla_rutas.id
-}
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.internetGateway.id
+  }
 
-resource "aws_route_table_association" "asociacion02" {
-subnet_id      = aws_subnet.zona_publica_2.id
-route_table_id = aws_route_table.tabla_rutas.id
+  tags = {
+    Name = "tablaRutasPublicas"
+  }
 }
 
-resource "aws_security_group" "instance_security_group" {
-name        = "ec2SecurityGroup"
-description = "Security group for EC2 instances"
-vpc_id      = aws_vpc.red_pirmaria.id
-
-ingress {
-from_port   = 0
-to_port     = 65535
-protocol    = "tcp"
-cidr_blocks = ["0.0.0.0/0"]
+resource "aws_route_table_association" "subRedPublica1_asociacionn" {
+  subnet_id      = aws_subnet.subRedPublica1.id
+  route_table_id = aws_route_table.tablaRutasPublicas.id
 }
 
-egress {
-from_port   = 0
-to_port     = 0
-protocol    = "-1"
-cidr_blocks = ["0.0.0.0/0"]
+resource "aws_route_table_association" "subRedPublica2_asociacion" {
+  subnet_id      = aws_subnet.subRedPublica2.id
+  route_table_id = aws_route_table.tablaRutasPublicas.id
+}
+resource "aws_security_group" "grupoSeguridad" {
+
+
+  name        = "grupoSeguridad_instancia"
+  description = "Instancia del grupo de seguridad"
+
+  vpc_id = aws_vpc.vpcPrimaria.id
+
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
-tags = {
-Env = "Prod"
-Type = "SecurityGroup"
-}
-}
+resource "aws_lb_target_group" "grupoTarget" {
+  name     = "grupoTarget"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.vpcPrimaria.id
 
-resource "aws_instance" "instance_1_primaria" {
-ami           = var.ami_id
-instance_type = "t2.micro"
-subnet_id     = aws_subnet.zona_publica_1.id
-
-vpc_security_group_ids = [
-aws_security_group.instance_security_group.id
-]
-
-tags = {
-Env = "Prod"
-Instance = "Primary1"
-}
+  health_check {
+    path                = "/"
+    protocol            = "HTTP"
+    port                = 80
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 4
+    interval            = 5
+  }
 }
 
-resource "aws_instance" "instance_2_primaria" {
-ami           = var.ami_id
-instance_type = "t2.micro"
-subnet_id     = aws_subnet.zona_publica_2.id
+resource "aws_lb" "balanceadorCarga" {
+  name               = "balanceadorCarga"
+  internal           = false  # Configúralo como "true" si deseas un ALB interno
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.grupoSeguridad.id]
+  subnets            = [aws_subnet.subRedPublica1.id, aws_subnet.subRedPublica2.id]
 
-vpc_security_group_ids = [
-aws_security_group.instance_security_group.id
-]
-
-tags = {
-Env = "Prod"
-Instance = "Primary2"
+  tags = {
+    Name = "balanceadorCarga"
+  }
 }
+
+resource "aws_instance" "InstanciaEC2" {
+  ami           = "ami-04b70fa74e45c3917"  # ID de la AMI de Amazon Linux 2, por ejemplo
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.subRedPublica1.id
+  associate_public_ip_address = true
+  key_name = "KeyPair"  # Nombre de la clave SSH que se utilizará para conectarse a la instancia
+
+  vpc_security_group_ids = [
+    aws_security_group.grupoSeguridad.id  # Asocia la instancia al grupo de seguridad definido arriba
+  ]
+  tags = {
+    Name = "InstanciaEc2_1"
+  }
+
+  depends_on = [aws_lb_target_group.grupoTarget]
+
+}
+
+resource "aws_instance" "InstanciaEC2_2" {
+  ami           = "ami-04b70fa74e45c3917"  # ID de la AMI de Amazon Linux 2, por ejemplo
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.subRedPublica2.id
+  associate_public_ip_address = true
+  key_name = "KeyPair2"  # Nombre de la clave SSH que se utilizará para conectarse a la instancia
+
+  vpc_security_group_ids = [
+    aws_security_group.grupoSeguridad.id  # Asocia la instancia al grupo de seguridad definido arriba
+  ]
+  tags = {
+    Name = "InstanciaEc2_2"
+  }
+
+  depends_on = [aws_lb_target_group.grupoTarget]
+
+}
+
+resource "aws_lb_target_group_attachment" "InstanciaEC2_attachment" {
+  target_group_arn = aws_lb_target_group.grupoTarget.arn
+  target_id        = aws_instance.InstanciaEC2.id
+  port             = 80
+}
+
+resource "aws_lb_target_group_attachment" "InstanciaEC2_2_attachment" {
+  target_group_arn = aws_lb_target_group.grupoTarget.arn
+  target_id        = aws_instance.InstanciaEC2_2.id
+  port             = 80
+}
+
+resource "aws_lb_listener" "listenerBalanceadorCarga" {
+  load_balancer_arn = aws_lb.balanceadorCarga.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.grupoTarget.arn
+  }
 }
